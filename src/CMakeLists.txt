@@ -3,7 +3,7 @@ include( ${LIBRARIES_DIR}/coreJSON/jsonFilePaths.cmake )
 include( ${LINKSDK_DIRS}/tuyaFilePaths.cmake )
 
 # Add a library with the above sources
-add_library( link_core STATIC
+add_library( link_core SHARED
     ${LINK_SDK_SOURCES}
     ${JSON_SOURCES}
 )

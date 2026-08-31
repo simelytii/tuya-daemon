@@ -2,7 +2,7 @@ include( ${LIBRARIES_DIR}/coreHTTP/httpFilePaths.cmake )
 include( ${LIBRARIES_DIR}/coreMQTT/mqttFilePaths.cmake )
 
 # Create target for POSIX implementation of reconnect logic.
-add_library( middleware_implementation STATIC
+add_library( middleware_implementation SHARED
                 ${MQTT_SOURCES}
                 ${MQTT_SERIALIZER_SOURCES}
                 ${HTTP_SOURCES}
