@@ -19,7 +19,8 @@ LDFLAGS = -L$(SDK_LIB_DIR) \
 LIBS = -llink_core \
        -lmiddleware_implementation \
        -lplatform_port \
-       -lutils_modules
+       -lutils_modules \
+       -lcjson
 
 .PHONY: all sdk clean
 

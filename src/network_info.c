@@ -6,110 +6,123 @@
 #include <net/if.h>
 #include <netdb.h>
 #include <sys/socket.h>
-#include <stdlib.h>
+#include <syslog.h>
 
 #include "network_info.h"
 
-static unsigned long long read_interface_stat(
-    const char *interface_name,
-    const char *stat_name)
+static int read_interface_stat(const char *interface_name,
+			       const char *stat_name,
+			       unsigned long long *value)
 {
-    char path[256];
-    FILE *file;
-    unsigned long long value = 0;
+	char path[256];
+	FILE *file;
 
-    snprintf(path,
-             sizeof(path),
-             "/sys/class/net/%s/statistics/%s",
-             interface_name,
-             stat_name);
+	if (value == NULL) {
+		syslog(LOG_ERR, "Network statistic output pointer is NULL");
+		return -1;
+	}
 
-    file = fopen(path, "r");
+	snprintf(path, sizeof(path),
+		 "/sys/class/net/%s/statistics/%s",
+		 interface_name, stat_name);
 
-    if (file == NULL) {
-        return 0;
-    }
+	file = fopen(path, "r");
 
-    if (fscanf(file, "%llu", &value) != 1) {
-        value = 0;
-    }
+	if (file == NULL) {
+		syslog(LOG_ERR,
+		       "Failed to open network statistics file: %s",
+		       path);
+		return -1;
+	}
 
-    fclose(file);
+	if (fscanf(file, "%llu", value) != 1) {
+		syslog(LOG_ERR,
+		       "Failed to read network statistic: %s",
+		       path);
+		fclose(file);
+		return -1;
+	}
 
-    return value;
+	fclose(file);
+
+	return 0;
 }
 
-int collect_network_info(struct network_info *interfaces, int max_interfaces)
+int collect_network_info(struct network_info *interfaces,
+			 int max_interfaces)
 {
-    struct ifaddrs *ifaddr;
-    struct ifaddrs *ifa;
-    int count = 0;
+	struct ifaddrs *ifaddr;
+	struct ifaddrs *ifa;
+	int count = 0;
 
-    if (interfaces == NULL || max_interfaces <= 0) {
-        return -1;
-    }
+	if (interfaces == NULL || max_interfaces <= 0) {
+		syslog(LOG_ERR, "Invalid network information arguments");
+		return -1;
+	}
 
-    if (getifaddrs(&ifaddr) == -1) {
-        return -1;
-    }
+	if (getifaddrs(&ifaddr) == -1) {
+		syslog(LOG_ERR, "Failed to get network interfaces");
+		return -1;
+	}
 
-    for (ifa = ifaddr; ifa != NULL && count < max_interfaces; ifa = ifa->ifa_next) {
+	for (ifa = ifaddr;
+	     ifa != NULL && count < max_interfaces;
+	     ifa = ifa->ifa_next) {
+		if (ifa->ifa_name == NULL || ifa->ifa_addr == NULL)
+			continue;
 
-        if (ifa->ifa_name == NULL || ifa->ifa_addr == NULL) {
-            continue;
-        }
+		if (strcmp(ifa->ifa_name, "lo") == 0)
+			continue;
 
-        if (strcmp(ifa->ifa_name, "lo") == 0) {
-            continue;
-        }
+		if (ifa->ifa_addr->sa_family != AF_INET)
+			continue;
 
-        if (ifa->ifa_addr->sa_family != AF_INET) {
-            continue;
-        }
+		strncpy(interfaces[count].name,
+			ifa->ifa_name,
+			sizeof(interfaces[count].name) - 1);
 
-        strncpy(interfaces[count].name,
-                ifa->ifa_name,
-                sizeof(interfaces[count].name) - 1);
+		interfaces[count].name[
+			sizeof(interfaces[count].name) - 1
+		] = '\0';
 
-        interfaces[count].name[
-            sizeof(interfaces[count].name) - 1
-        ] = '\0';
+		if (getnameinfo(ifa->ifa_addr,
+				sizeof(struct sockaddr_in),
+				interfaces[count].ip_address,
+				sizeof(interfaces[count].ip_address),
+				NULL,
+				0,
+				NI_NUMERICHOST) != 0) {
+			interfaces[count].ip_address[0] = '\0';
+		}
 
-        if (getnameinfo(ifa->ifa_addr,
-                        sizeof(struct sockaddr_in),
-                        interfaces[count].ip_address,
-                        sizeof(interfaces[count].ip_address),
-                        NULL,
-                        0,
-                        NI_NUMERICHOST) != 0) {
+		if (ifa->ifa_netmask != NULL) {
+			if (getnameinfo(ifa->ifa_netmask,
+					sizeof(struct sockaddr_in),
+					interfaces[count].netmask,
+					sizeof(interfaces[count].netmask),
+					NULL,
+					0,
+					NI_NUMERICHOST) != 0) {
+				interfaces[count].netmask[0] = '\0';
+			}
+		} else {
+			interfaces[count].netmask[0] = '\0';
+		}
 
-            interfaces[count].ip_address[0] = '\0';
-        }
+		if (read_interface_stat(interfaces[count].name,
+					"tx_bytes",
+					&interfaces[count].tx_bytes) != 0)
+			interfaces[count].tx_bytes = 0;
 
-        if (ifa->ifa_netmask != NULL) {
-            if (getnameinfo(ifa->ifa_netmask,
-                            sizeof(struct sockaddr_in),
-                            interfaces[count].netmask,
-                            sizeof(interfaces[count].netmask),
-                            NULL,
-                            0,
-                            NI_NUMERICHOST) != 0) {
+		if (read_interface_stat(interfaces[count].name,
+					"rx_bytes",
+					&interfaces[count].rx_bytes) != 0)
+			interfaces[count].rx_bytes = 0;
 
-                interfaces[count].netmask[0] = '\0';
-            }
-        } else {
-            interfaces[count].netmask[0] = '\0';
-        }
-        
-        interfaces[count].tx_bytes =
-        read_interface_stat(interfaces[count].name, "tx_bytes");
+		count++;
+	}
 
-        interfaces[count].rx_bytes =
-        read_interface_stat(interfaces[count].name, "rx_bytes");
-        count++;
-    }
+	freeifaddrs(ifaddr);
 
-    freeifaddrs(ifaddr);
-
-    return count;
+	return count;
 }
