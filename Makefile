@@ -1,39 +1,39 @@
-CC = gcc
-
-SDK_DIR = $(HOME)/Documents/tuya-iot-core-sdk
-
-CFLAGS = -Wall -Wextra -std=c99 -g \
-    -Iinclude \
-    -I/home/studentas/Documents/tuya-iot-core-sdk/include \
-    -I/home/studentas/Documents/tuya-iot-core-sdk/interface \
-    -I/home/studentas/Documents/tuya-iot-core-sdk/utils
-
-LDFLAGS = -L$(SDK_DIR)/build/lib \
-	-Wl,-rpath,$(SDK_DIR)/build/lib
-
-LIBS = -llink_core \
-	-lmiddleware_implementation \
-	-lplatform_port \
-	-lutils_modules
-
 TARGET = tuya-daemon
 
-SRC = src/main.c \
-      src/daemon.c \
-      src/system_info.c \
-      src/network_info.c \
-      src/cpu_info.c \
-	  src/action.o
+SDK_DIR = tuya-iot-core-sdk
+SDK_BUILD_DIR = $(SDK_DIR)/build
+SDK_LIB_DIR = $(SDK_BUILD_DIR)/lib
 
-OBJ = $(SRC:.c=.o)
+SOURCES = $(wildcard src/*.c)
+OBJECTS = $(SOURCES:.c=.o)
+
+CFLAGS = -Wall -Wextra \
+         -Iinclude \
+         -I$(SDK_DIR)/include \
+         -I$(SDK_DIR)/interface \
+         -I$(SDK_DIR)/utils
+
+LDFLAGS = -L$(SDK_LIB_DIR) \
+          -Wl,-rpath,$(SDK_LIB_DIR)
+
+LIBS = -llink_core \
+       -lmiddleware_implementation \
+       -lplatform_port \
+       -lutils_modules
+
+.PHONY: all sdk clean
 
 all: $(TARGET)
 
-$(TARGET): $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
+$(TARGET): sdk $(OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $(OBJECTS) $(LDFLAGS) $(LIBS)
+
+sdk:
+	cmake -S $(SDK_DIR) -B $(SDK_BUILD_DIR) -DBUILD_SHARED_LIBS=ON
+	cmake --build $(SDK_BUILD_DIR)
 
 src/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(OBJ) $(TARGET)
+	rm -f $(OBJECTS) $(TARGET)

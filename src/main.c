@@ -26,10 +26,10 @@ struct arguments {
 };
 
 static struct argp_option options[] = {
-    {"device-id", 'd', "DEVICE_ID", 0, "Tuya device ID"},
-    {"device-secret", 's', "DEVICE_SECRET", 0, "Tuya device secret"},
-    {"product-id", 'p', "PRODUCT_ID", 0, "Tuya product ID"},
-    {"daemon", 'D', 0, 0, "Run as daemon"},
+    {"device-id", 'd', "DEVICE_ID", 0, "Tuya device ID", 0},
+    {"device-secret", 's', "DEVICE_SECRET", 0, "Tuya device secret", 0},
+    {"product-id", 'p', "PRODUCT_ID", 0, "Tuya product ID", 0},
+    {"daemon", 'D', 0, 0, "Run as daemon", 0},
     {0}
 };
 
@@ -108,9 +108,11 @@ static struct argp argp = {
     options,
     parse_opt,
     0,
-    "Tuya IoT monitoring daemon"
+    "Tuya IoT monitoring daemon",
+    0,
+    0,
+    0
 };
-
 
 static void report_system_info(void)
 {
@@ -166,53 +168,73 @@ static void report_system_info(void)
     cJSON_AddNumberToObject(item, "value", cpu_usage);
     cJSON_AddItemToObject(root, "cpu_usage", item);
 
-    if (interface_count > 0) {
-    item = cJSON_CreateObject();
-    cJSON_AddStringToObject(
-        item,
-        "value",
-        interfaces[0].name
-    );
-    cJSON_AddItemToObject(root, "interface_name", item);
+    cJSON *interface_array;
+    cJSON *ip_array;
+    cJSON *netmask_array;
+    cJSON *tx_array;
+    cJSON *rx_array;
 
-    item = cJSON_CreateObject();
-    cJSON_AddStringToObject(
-        item,
-        "value",
-        interfaces[0].ip_address
-    );
-    cJSON_AddItemToObject(root, "ip_address", item);
+    interface_array = cJSON_CreateArray();
+    ip_array = cJSON_CreateArray();
+    netmask_array = cJSON_CreateArray();
+    tx_array = cJSON_CreateArray();
+    rx_array = cJSON_CreateArray();
 
-    item = cJSON_CreateObject();
-    cJSON_AddStringToObject(
-        item,
-        "value",
-        interfaces[0].netmask
-    );
-    cJSON_AddItemToObject(root, "netmask", item);
+    if (interface_array == NULL ||
+        ip_array == NULL ||
+        netmask_array == NULL ||
+        tx_array == NULL ||
+        rx_array == NULL) {
 
-    item = cJSON_CreateObject();
-    cJSON_AddNumberToObject(
-        item,
-        "value",
-        (double)interfaces[0].tx_bytes
-    );
-    cJSON_AddItemToObject(root, "tx_bytes", item);
+        syslog(LOG_ERR, "Failed to create network arrays");
 
-    item = cJSON_CreateObject();
-    cJSON_AddNumberToObject(
-        item,
-        "value",
-        (double)interfaces[0].rx_bytes
-    );
-    cJSON_AddItemToObject(root, "rx_bytes", item);
+        cJSON_Delete(interface_array);
+        cJSON_Delete(ip_array);
+        cJSON_Delete(netmask_array);
+        cJSON_Delete(tx_array);
+        cJSON_Delete(rx_array);
+        cJSON_Delete(root);
+
+        return;
     }
 
     for (i = 0; i < interface_count; i++) {
-        /*
-         * Network information will be added here.
-         */
+
+        cJSON_AddItemToArray(
+            interface_array,
+            cJSON_CreateString(interfaces[i].name)
+        );
+
+        cJSON_AddItemToArray(
+            ip_array,
+            cJSON_CreateString(interfaces[i].ip_address)
+        );
+
+        cJSON_AddItemToArray(
+            netmask_array,
+            cJSON_CreateString(interfaces[i].netmask)
+        );
+
+        cJSON_AddItemToArray(
+            tx_array,
+            cJSON_CreateNumber(
+            (int)(interfaces[i].tx_bytes / (1024ULL * 1024ULL))
+        )
+        );
+
+        cJSON_AddItemToArray(
+            rx_array,
+            cJSON_CreateNumber(
+            (int)(interfaces[i].rx_bytes / (1024ULL * 1024ULL))
+        )
+        );
     }
+
+    cJSON_AddItemToObject(root, "network_interface", interface_array);
+    cJSON_AddItemToObject(root, "ip_address", ip_array);
+    cJSON_AddItemToObject(root, "netmask", netmask_array);
+    cJSON_AddItemToObject(root, "tx_mb", tx_array);
+    cJSON_AddItemToObject(root, "rx_mb", rx_array);
 
     json = cJSON_PrintUnformatted(root);
 
