@@ -19,6 +19,28 @@ static int add_number_item(cJSON *root, const char *name, double value)
 	return 0;
 }
 
+static int add_array_item(cJSON *root, const char *name, cJSON *array)
+{
+	cJSON *item;
+ 
+	if (array == NULL) {
+		syslog(LOG_ERR, "Array item is NULL: %s", name);
+		return -1;
+	}
+ 
+	item = cJSON_CreateObject();
+	if (item == NULL) {
+		syslog(LOG_ERR, "Failed to create JSON item: %s", name);
+		cJSON_Delete(array);
+		return -1;
+	}
+ 
+	cJSON_AddItemToObject(item, "value", array);
+	cJSON_AddItemToObject(root, name, item);
+ 
+	return 0;
+}
+
 cJSON *build_telemetry_json(const struct system_info *system,
 			    const struct network_info *interfaces,
 			    int interface_count, double cpu_usage)
@@ -121,12 +143,14 @@ cJSON *build_telemetry_json(const struct system_info *system,
 				      (1024ULL * 1024ULL))));
 	}
 
-	cJSON_AddItemToObject(root, "network_interface",
-			       interface_array);
-	cJSON_AddItemToObject(root, "ip_address", ip_array);
-	cJSON_AddItemToObject(root, "netmask", netmask_array);
-	cJSON_AddItemToObject(root, "tx_mb", tx_array);
-	cJSON_AddItemToObject(root, "rx_mb", rx_array);
-
+	if (add_array_item(root, "network_interface", interface_array) != 0 ||
+	    add_array_item(root, "ip_address", ip_array) != 0 ||
+	    add_array_item(root, "netmask", netmask_array) != 0 ||
+	    add_array_item(root, "tx_mb", tx_array) != 0 ||
+	    add_array_item(root, "rx_mb", rx_array) != 0) {
+		cJSON_Delete(root);
+		return NULL;
+	}
+	
 	return root;
 }
