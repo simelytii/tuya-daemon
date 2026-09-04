@@ -1,59 +1,61 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <fcntl.h>
+
+#include "daemon.h"
 
 int daemonize(void)
 {
-    pid_t pid;
-    int fd;
+    int maxfd, fd;
 
-    pid = fork();
+    switch (fork()) {
+        case -1:
+            return -1;
 
-    if (pid < 0) {
+        case 0:
+            break;
+
+        default:
+            _exit(EXIT_SUCCESS);
+    }
+
+    if (setsid() == -1)
         return -1;
-    }
 
-    if (pid > 0) {
-        exit(EXIT_SUCCESS);
-    }
+    switch (fork()) {
+        case -1:
+            return -1;
 
-    if (setsid() < 0) {
-        return -1;
-    }
+        case 0:
+            break;
 
-    pid = fork();
-
-    if (pid < 0) {
-        return -1;
-    }
-
-    if (pid > 0) {
-        exit(EXIT_SUCCESS);
-    }
-
-    if (chdir("/") < 0) {
-        return -1;
+        default:
+            _exit(EXIT_SUCCESS);
     }
 
     umask(0);
 
-    close(STDIN_FILENO);
+    if (chdir("/") < 0)
+        return -1;
+
+    maxfd = sysconf(_SC_OPEN_MAX);
+
+    if (maxfd == -1)
+        maxfd = BD_MAX_CLOSE;
+    for (fd = 0; fd < maxfd; fd++)
+        close(fd);
 
     fd = open("/dev/null", O_RDWR);
 
-    if (fd != STDIN_FILENO) {
+    if (fd != STDIN_FILENO)
         return -1;
-    }
 
-    if (dup2(STDIN_FILENO, STDOUT_FILENO) != STDOUT_FILENO) {
+    if (dup2(STDIN_FILENO, STDOUT_FILENO) != STDOUT_FILENO)
         return -1;
-    }
 
-    if (dup2(STDIN_FILENO, STDERR_FILENO) != STDERR_FILENO) {
+    if (dup2(STDIN_FILENO, STDERR_FILENO) != STDERR_FILENO)
         return -1;
-    }
 
     return 0;
 }
