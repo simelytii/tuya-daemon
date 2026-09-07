@@ -13,7 +13,7 @@ static volatile sig_atomic_t running = 1;
 
 static void handle_signal(int signal)
 {
-    if (signal == SIGTERM || signal == SIGINT) {
+    if (signal == SIGTERM || signal == SIGINT || signal == SIGQUIT) {
         running = 0;
     }
 }
@@ -32,7 +32,8 @@ int main(int argc, char **argv)
     sa.sa_flags = 0;
 
     if (sigaction(SIGTERM, &sa, NULL) != 0 ||
-        sigaction(SIGINT, &sa, NULL) != 0) {
+        sigaction(SIGINT, &sa, NULL) != 0 ||
+        sigaction(SIGQUIT, &sa, NULL) != 0) {
 
         syslog(LOG_ERR, "Failed to install signal handlers");
         closelog();

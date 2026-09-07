@@ -7,8 +7,8 @@
 
 struct network_info {
     char name[64];
-    char ip_address[INET6_ADDRSTRLEN];
-    char netmask[INET6_ADDRSTRLEN];
+    char ip_address[INET_ADDRSTRLEN];
+    char netmask[INET_ADDRSTRLEN];
     unsigned long long tx_bytes;
     unsigned long long rx_bytes;
 };
