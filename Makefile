@@ -20,7 +20,8 @@ LIBS = -llink_core \
        -lmiddleware_implementation \
        -lplatform_port \
        -lutils_modules \
-       -lcjson
+       -lcjson \
+       -lm
 
 .PHONY: all sdk clean
 

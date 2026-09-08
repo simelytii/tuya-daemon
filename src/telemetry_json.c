@@ -1,5 +1,6 @@
 #include <syslog.h>
 #include <cjson/cJSON.h>
+#include <math.h>
 
 #include "telemetry_json.h"
 
@@ -70,15 +71,17 @@ cJSON *build_telemetry_json(const struct system_info *system,
 	}
 
 	if (add_number_item(root, "total_ram",
-			    system->total_ram / (1024.0 * 1024.0)) != 0) {
-		cJSON_Delete(root);
-		return NULL;
+                    round(system->total_ram /
+                          (1024.0 * 1024.0) * 100.0) / 100.0) != 0) {
+    	cJSON_Delete(root);
+    	return NULL;
 	}
 
 	if (add_number_item(root, "free_ram",
-			    system->free_ram / (1024.0 * 1024.0)) != 0) {
-		cJSON_Delete(root);
-		return NULL;
+                    round(system->free_ram /
+                          (1024.0 * 1024.0) * 100.0) / 100.0) != 0) {
+    	cJSON_Delete(root);
+    	return NULL;
 	}
 
 	if (add_number_item(root, "system_uptime",
@@ -87,9 +90,10 @@ cJSON *build_telemetry_json(const struct system_info *system,
 		return NULL;
 	}
 
-	if (add_number_item(root, "cpu_usage", cpu_usage) != 0) {
-		cJSON_Delete(root);
-		return NULL;
+	if (add_number_item(root, "cpu_usage",
+                    round(cpu_usage * 100.0) / 100.0) != 0) {
+    	cJSON_Delete(root);
+    	return NULL;
 	}
 
 	interface_array = cJSON_CreateArray();
